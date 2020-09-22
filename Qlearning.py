@@ -39,3 +39,52 @@ class Q_Learner(object):
             return np.argmax(self.Q[discretized_obs])
         else:
             return np.random.choice([a for a in range(self.action_shape)])
+    def learn(self, obs, action, reward, next_obs):
+        discretized_obs = self.discretize(obs)
+        discretized_next_obs = self.discretize(next_obs)
+        td_target = reward + self.gamma * np.max(self.Q[discretized_next_obs])
+        td_error = td_target - self.Q[discretized_obs][action]
+        self.Q[discretized_obs][action] += self.alpha * td_error
+
+def train(agent, env):
+    best_reward = -float('inf')
+    for episode in range(MAX_NUM_EPISODES):
+        done = False
+        obs = env.reset()
+        total_reward = 0.0
+        while not done:
+            action = agent.get_action(obs)
+            next_obs, reward, done, info = env.step(action)
+            agent.learn(obs, action, reward, next_obs)
+            obs = next_obs
+            total_reward += reward
+        if total_reward > best_reward:
+            best_reward = total_reward
+        print("Episode#:{} reward:{} best_reward:{} eps:{}".format(episode,
+                                        total_reward, best_reward, agent.epsilon))
+    # Return the trained policy
+    return np.argmax(agent.Q, axis=2)
+
+def test(agent, env, policy):
+    done = False
+    obs = env.reset()
+    total_reward = 0.0
+    while not done:
+        action = policy[agent.discretize(obs)]
+        next_obs, reward, done, info = env.step(action)
+        obs = next_obs
+        total_reward += reward
+    return total_reward
+
+
+if __name__ == "__main__":
+    env = gym.make('MountainCar-v0')
+    agent = Q_Learner(env)
+    learned_policy = train(agent, env)
+    # Use the Gym Monitor wrapper to evalaute the agent and record video
+    gym_monitor_path = "./gym_monitor_output"
+    env = gym.wrappers.Monitor(env, gym_monitor_path, force=True)
+    for _ in range(1000):
+        test(agent, env, learned_policy)
+    env.close()
+
